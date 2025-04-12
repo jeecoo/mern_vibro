@@ -14,7 +14,7 @@ router.post('/register', async (req, res) => {
     try {
         const { email,username, password } = req.body;
 
-        if(!email || !password) {
+        if(!username ||!email || !password) {
             return res.status(400).json({ message: 'Please fill in all fields' });
         }
 
@@ -60,7 +60,6 @@ router.post('/register', async (req, res) => {
     } catch (error) {
         console.log("Error in register route", error);
         res.status(500).json({ message: 'Server error' });
-        
     }
 });
 
