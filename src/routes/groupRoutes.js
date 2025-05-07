@@ -85,12 +85,13 @@ router.get('/getMembers/:groupId',verifyToken, async (req, res) => { // Removed 
     const userId = req.user.userId; 
     const { groupId } = req.params; // Get the groupId from the URL parameters
 
+
     try {
         
         const groupUserLinks = await GroupUser.find({ groupid: new mongoose.Types.ObjectId(groupId) });
         const userIds = groupUserLinks.map(link => link.userid);           // lowercase
         const users = await User.find({ _id: { $in: userIds } }).select('-password');
-        res.status(200).json({ users });
+        res.status(200).json({ users, userIds,groupUserLinks });
 
     } catch (error) {
         console.error("Error fetching user's groups:", error);
