@@ -81,6 +81,24 @@ router.get('/getGroups',verifyToken, async (req, res) => {
     }
 });
 
+router.get('/getMembers/:groupId',verifyToken, async (req, res) => { // Removed verifyToken to make it public for simplicity
+    const userId = req.user.userId; 
+    const { groupId } = req.params; // Get the groupId from the URL parameters
+
+    try {
+        
+        const groupUserLinks = await GroupUser.find({ groupId: groupId });
+       
+        const groupIds = groupUserLinks.map(link => link.userId);
+        const users = await User.find({ _id: { $in: userIds } }).select('-password');        // Step 2: Find all active groups the user belongs to
+        res.status(200).json({ users });
+
+    } catch (error) {
+        console.error("Error fetching user's groups:", error);
+        res.status(500).json({ message: 'Server error while fetching user groups', error: error.message });
+    }
+});
+
 // 3. Get a specific group by ID
 // GET /api/groups/:groupId
 // Public or Private
