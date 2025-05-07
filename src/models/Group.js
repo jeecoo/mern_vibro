@@ -13,10 +13,6 @@ const groupSchema = new mongoose.Schema({
         type: String,
         default: "", 
     },
-    admins: [{ 
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-    }],
     isActive: {
         type: Boolean,
         default: true, 
@@ -29,9 +25,7 @@ const groupSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 groupSchema.pre('save', function(next) {
-    if (this.isNew && !this.admins.includes(this.createdBy)) {
-        this.admins.push(this.createdBy);
-    }
+ 
     next();
 });
 

@@ -38,16 +38,17 @@ router.post('/createGroup', verifyToken, async (req, res) => {
         // Populate createdBy and members/admins fields for the response
         const populatedGroup = await Group.findById(newGroup._id)
             .populate('createdBy', 'username profileImage email')
-            .populate('members', 'username profileImage email')
-            .populate('admins', 'username profileImage email');
 
         res.status(201).json({ group: populatedGroup, message: 'Group created successfully' });
-
+        
         const groupUser = new GroupUser({
             userid: createdByUserId,
+            isAdmin: true,
             groupid: newGroup._id
         });
         await groupUser.save();
+        
+        
 
     } catch (error) {
         console.error("Error creating group:", error);
@@ -102,9 +103,7 @@ router.get('/:groupId', async (req, res) => { // Removed verifyToken to make it 
     }
 });
 
-// 4. Update group details (name, photo)
-// PUT /api/groups/:groupId
-// Requires authentication and user to be an admin of the group
+
 router.put('/:groupId', verifyToken, async (req, res) => {
     try {
         const { groupName, groupPhoto, isActive } = req.body;

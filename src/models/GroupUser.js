@@ -7,6 +7,10 @@ const groupUserSchema = new mongoose.Schema({
         ref: "User",
         required: true
     },
+    isAdmin: {
+        type: Boolean,
+        required: true
+    },
     groupid: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Group",
