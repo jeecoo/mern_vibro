@@ -87,10 +87,9 @@ router.get('/getMembers/:groupId',verifyToken, async (req, res) => { // Removed 
 
     try {
         
-        const groupUserLinks = await GroupUser.find({ groupId: groupId });
-       
-        const groupIds = groupUserLinks.map(link => link.userId);
-        const users = await User.find({ _id: { $in: userIds } }).select('-password');        // Step 2: Find all active groups the user belongs to
+        const groupUserLinks = await GroupUser.find({ groupid: groupId }); // lowercase
+        const userIds = groupUserLinks.map(link => link.userid);           // lowercase
+        const users = await User.find({ _id: { $in: userIds } }).select('-password');
         res.status(200).json({ users });
 
     } catch (error) {
