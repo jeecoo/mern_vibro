@@ -87,15 +87,13 @@ router.get('/getGroups',verifyToken, async (req, res) => {
 router.get('/:groupId',verifyToken, async (req, res) => { // Removed verifyToken to make it public for simplicity
     try {
         const group = await Group.findById(req.params.groupId)
-            .populate('members', 'username profileImage email') // More detailed member info
-            .populate('admins', 'username profileImage email') // Admin info
             .populate('createdBy', 'username profileImage email'); // Creator info
 
         if (!group) {
             return res.status(404).json({ message: 'Group not found' });
         }
         if (!group.isActive) {
-            res.status(500).json({ group });
+            res.status(200).json({ group });
         }
 
         res.status(200).json({ group });
