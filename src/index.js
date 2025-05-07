@@ -6,7 +6,7 @@ import job from "./lib/cron.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import { connectDB } from "./lib/db.js";
-
+import groupRoutes from "./routes/groupRoutes.js";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -15,7 +15,7 @@ app.use(express.json());
 app.use(cors())
 
 app.use("/api/auth", authRoutes)
-
+app.use("/api/group", groupRoutes)
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
     connectDB()
