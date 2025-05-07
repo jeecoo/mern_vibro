@@ -1,4 +1,4 @@
-
+// models/Group.js
 import mongoose from "mongoose";
 
 const groupSchema = new mongoose.Schema({
@@ -11,40 +11,30 @@ const groupSchema = new mongoose.Schema({
     },
     groupPhoto: {
         type: String,
-        default: "", // You can set a default group photo URL here if you like
+        default: "", 
     },
-    members: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User", // References the 'User' model
-    }],
-    admins: [{ // Optional: to specify users who can manage the group
+    admins: [{ 
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
     }],
     isActive: {
         type: Boolean,
-        default: true, // Groups are active by default
+        default: true, 
     },
-    createdBy: { // To know who created the group
+    createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: true,
     }
 }, { timestamps: true });
 
-// Optional: Pre-save hook to add the creator to members and admins
 groupSchema.pre('save', function(next) {
-    if (this.isNew) {
-        if (!this.members.includes(this.createdBy)) {
-            this.members.push(this.createdBy);
-        }
-        if (!this.admins.includes(this.createdBy)) {
-            this.admins.push(this.createdBy);
-        }
+    if (this.isNew && !this.admins.includes(this.createdBy)) {
+        this.admins.push(this.createdBy);
     }
     next();
 });
 
 const Group = mongoose.model("Group", groupSchema);
 
-export default Group
+export default Group;

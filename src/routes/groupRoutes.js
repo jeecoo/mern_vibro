@@ -3,6 +3,7 @@ import Group from '../models/Group.js'; // Assuming your Group model is here
 import { verifyToken } from '../middleware/authMiddleware.js'; 
 
 import User from '../models/User.js';
+import GroupUser from '../models/GroupUser.js';
 
 
 
@@ -41,6 +42,12 @@ router.post('/createGroup', verifyToken, async (req, res) => {
             .populate('admins', 'username profileImage email');
 
         res.status(201).json({ group: populatedGroup, message: 'Group created successfully' });
+
+        const groupUser = new GroupUser({
+            userid: createdByUserId,
+            groupid: newGroup._id
+        });
+        await groupUser.save();
 
     } catch (error) {
         console.error("Error creating group:", error);
