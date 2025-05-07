@@ -5,7 +5,7 @@ import { verifyToken } from '../middleware/authMiddleware.js';
 import User from '../models/User.js';
 import GroupUser from '../models/GroupUser.js';
 
-
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
@@ -60,17 +60,24 @@ router.post('/createGroup', verifyToken, async (req, res) => {
 });
 
 
-router.get('/', async (req, res) => { // Removed verifyToken to make it public for simplicity, add back if needed
+router.get('/getGroups',verifyToken, async (req, res) => { 
+    const userId = req.user.userId; // Get user ID from the middleware
+
     try {
-        const groups = await Group.find({ isActive: true })
-            .populate('members', 'username profileImage') // Populate basic member info
-            .populate('createdBy', 'username profileImage') // Populate creator info
-            .sort({ createdAt: -1 }); // Show newest groups first
+        
+        const groupUserLinks = await GroupUser.find({ userid: userId });
+        const groupIds = groupUserLinks.map(link => link.groupid);
+
+        // Step 2: Find all active groups the user belongs to
+        const groups = await Group.find({ _id: { $in: groupIds }, isActive: true })
+            .populate('createdBy', 'username profileImage email') // optional
+            .sort({ createdAt: -1 });
 
         res.status(200).json({ groups });
+
     } catch (error) {
-        console.error("Error fetching groups:", error);
-        res.status(500).json({ message: 'Server error while fetching groups', error: error.message });
+        console.error("Error fetching user's groups:", error);
+        res.status(500).json({ message: 'Server error while fetching user groups', error: error.message });
     }
 });
 
