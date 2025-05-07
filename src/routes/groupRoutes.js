@@ -84,7 +84,7 @@ router.get('/getGroups',verifyToken, async (req, res) => {
 // 3. Get a specific group by ID
 // GET /api/groups/:groupId
 // Public or Private
-router.get('/:groupId', async (req, res) => { // Removed verifyToken to make it public for simplicity
+router.get('/:groupId',verifyToken, async (req, res) => { // Removed verifyToken to make it public for simplicity
     try {
         const group = await Group.findById(req.params.groupId)
             .populate('members', 'username profileImage email') // More detailed member info
@@ -95,9 +95,7 @@ router.get('/:groupId', async (req, res) => { // Removed verifyToken to make it 
             return res.status(404).json({ message: 'Group not found' });
         }
         if (!group.isActive) {
-            // Optionally, you might want to restrict access to inactive groups
-            // or show a specific message. For simplicity, we'll return it.
-            // return res.status(404).json({ message: 'Group is not active' });
+            res.status(500).json({ group });
         }
 
         res.status(200).json({ group });
