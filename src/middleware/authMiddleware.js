@@ -12,11 +12,10 @@ export const verifyToken = (req, res, next) => {
 
     try {
         // Verify the token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);  // Use your secret key
-        req.user = decoded; // Attach the decoded payload (typically the user ID) to the request object
-        next(); // Call the next middleware or route handler
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);  
+        req.user = decoded; 
+        next();
     } catch (error) {
-        // Handle token verification errors (e.g., expired, invalid signature)
         return res.status(401).json({ message: 'Invalid token', error: error.message });
     }
 };
