@@ -1,12 +1,11 @@
 import express from 'express';
 import Group from '../models/Group.js'; // Assuming your Group model is here
 import { verifyToken } from '../middleware/authMiddleware.js'; 
-
+import mongoose from "mongoose";  // Ensure mongoose is imported
 import User from '../models/User.js';
 import GroupUser from '../models/GroupUser.js';
 
 import jwt from 'jsonwebtoken';
-
 const router = express.Router();
 
 
@@ -88,13 +87,15 @@ router.get('/getMembers/:groupId',verifyToken, async (req, res) => { // Removed 
 
     try {
         
-        const groupUserLinks = await GroupUser.find({ groupid: new mongoose.Types.ObjectId(groupId) });
+        const groupUserLinks = await GroupUser.find({ groupid: new mongoose.Types.ObjectId(groupId) })
+        .populate('userid', 'username profileImage email'); // Populate the 'userid' field with the required fields
+    
         const userIds = groupUserLinks.map(link => link.userid);           // lowercase
         const users = await User.find({ _id: { $in: userIds } }).select('-password');
-        res.status(200).json({ users, userIds,groupUserLinks });
+        res.status(200).json({ users });
 
     } catch (error) {
-        console.error("Error fetching user's groups:", error);
+        console.error("Error fetching groups member:", error);
         res.status(500).json({ message: 'Server error while fetching user groups', error: error.message });
     }
 });
@@ -318,8 +319,49 @@ router.delete('/:groupId/members/:memberId', verifyToken, async (req, res) => {
 });
 
 
-// You would then mount these routes in your main server file (e.g., app.js or server.js)
-// import groupRoutes from './routes/groupRoutes.js'; // Adjust path as needed
-// app.use('/api/groups', groupRoutes);
+
+router.post('/:groupId/join', verifyToken, async (req, res) => {
+    try {
+        const groupId = req.params.groupId;
+        const userId = req.user.userId; // The logged-in user
+
+        const group = await Group.findById(groupId);
+        if (!group) {
+            return res.status(404).json({ message: 'Group not found.' });
+        }
+
+        // Check if user is already a member of the group
+        const existingMembership = await GroupUser.findOne({ groupid: groupId, userid: userId });
+        if (existingMembership) {
+            return res.status(400).json({ message: 'You are already a member of this group.' });
+        }
+
+        // Create the relationship between the user and the group
+        const groupUser = new GroupUser({
+            groupid: groupId,
+            userid: userId,
+            isAdmin: false, // Default role is not admin
+        });
+        await groupUser.save();
+
+        // Optionally, update the group's members list
+        group.members.push(userId);
+        await group.save();
+
+        // Return the updated group with the new member
+        const populatedGroup = await Group.findById(groupId)
+            .populate('members', 'username profileImage email')
+            .populate('admins', 'username profileImage email')
+            .populate('createdBy', 'username profileImage email');
+
+        res.status(200).json({ group: populatedGroup, message: 'Joined group successfully.' });
+    } catch (error) {
+        console.error("Error joining group:", error);
+        res.status(500).json({ message: 'Server error while joining group', error: error.message });
+    }
+});
+
+
+
 
 export default router;

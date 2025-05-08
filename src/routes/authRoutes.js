@@ -1,6 +1,7 @@
 import express from 'express';
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose'; // Ensure this is at the top of your file
 
 import { verifyToken } from '../middleware/authMiddleware.js'; 
 
