@@ -46,7 +46,9 @@ io.on("connection", (socket) => {
     console.log(`Heartbeat received from ${userId}`);
    
     // Optionally emit a user-online event here
-    io.emit('user-online', { userId });
+    if(userSockets.has(userId)){
+       io.emit('user-online', { userId });
+    }
   });
 
   socket.on("disconnect", () => {
@@ -58,7 +60,7 @@ io.on("connection", (socket) => {
     const sockets = userSockets.get(userId);
     if (sockets) {
       sockets.delete(socket.id);
-      if (sockets.size === 0) {
+      if (sockets.size === 0) { 
         userSockets.delete(userId);
       }
     }
@@ -109,3 +111,5 @@ setInterval(async () => {
       console.error('Error during automatic cleanup of old detected sounds:', error);
   }
 }, 60 * 60 * 1000); // Run every hour (60 minutes)
+
+export { io,socketGroups,userSockets };

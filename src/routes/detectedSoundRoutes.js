@@ -2,7 +2,7 @@
 import express from 'express';
 import DetectedSound from '../models/DetectedSound.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
-
+import { io, socketGroups, userSockets } from '../index.js';
 const router = express.Router();
 
 // POST /api/sounds/add - Add a detected sound
@@ -22,6 +22,25 @@ router.post('/add', verifyToken, async (req, res) => {
         });
 
         await sound.save();
+
+           const socketIds = userSockets.get(userId);
+
+        if (socketIds) {
+            const notifiedGroups = new Set(); // To avoid duplicate emissions
+            for (const socketId of socketIds) {
+                const groupsForSocket = socketGroups.get(socketId);
+                if (groupsForSocket) {
+                    for (const groupId of groupsForSocket) {
+                        if (!notifiedGroups.has(groupId)) {
+                            io.to(groupId).emit("new-sound", { userId });
+                            notifiedGroups.add(groupId);
+                        }
+                    }
+                }
+            }
+        }
+
+
         res.status(201).json({ sound, message: 'Detected sound saved successfully.' });
     } catch (error) {
         console.error('Error saving detected sound:', error);
