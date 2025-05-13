@@ -1,6 +1,7 @@
 import express from 'express';
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose'; // Ensure this is at the top of your file
 
 import { verifyToken } from '../middleware/authMiddleware.js'; 
 
@@ -115,12 +116,12 @@ router.put('/update', verifyToken, async (req, res) => {
         // Find and update the user
         const updatedUser = await User.findByIdAndUpdate(
             userId,
-            { username }, //  fields to update
-            { new: true, runValidators: true } // Return the updated user and run validation
-        ).select('-password'); // Exclude the password from the response
+            { username }, 
+            { new: true, runValidators: true } 
+        ).select('-password'); 
 
         if (!updatedUser) {
-            return res.status(404).json({ message: 'User not found' }); //should not happen, unless token is invalid
+            return res.status(404).json({ message: 'User not found' }); 
         }
 
         res.status(200).json({
