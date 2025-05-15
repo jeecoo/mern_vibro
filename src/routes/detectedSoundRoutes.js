@@ -8,20 +8,21 @@ const router = express.Router();
 // POST /api/sounds/add - Add a detected sound
 router.post('/add', verifyToken, async (req, res) => {
     try {
-        const { label, confidence } = req.body;
+        const { label, confidence, sound } = req.body;
         const userId = req.user.userId;
 
         if (!label || !confidence) {
             return res.status(400).json({ message: 'Label and confidence are required.' });
         }
 
-        const sound = new DetectedSound({
+        const newsound = new DetectedSound({
             userid: userId,
             label,
             confidence,
+            sound,
         });
 
-        await sound.save();
+        await newsound.save();
 
            const socketIds = userSockets.get(userId);
 
@@ -41,7 +42,7 @@ router.post('/add', verifyToken, async (req, res) => {
         }
 
 
-        res.status(201).json({ sound, message: 'Detected sound saved successfully.' });
+        res.status(201).json({ newsound, message: 'Detected sound saved successfully.' });
     } catch (error) {
         console.error('Error saving detected sound:', error);
         res.status(500).json({ message: 'Server error while saving detected sound', error: error.message });
