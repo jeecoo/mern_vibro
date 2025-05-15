@@ -15,6 +15,10 @@ const detectedSound = new mongoose.Schema({
         type: String,
         required: true,
     },
+     sound: {
+        type: String,
+        required: true,
+    }
    
 }, { timestamps: true });
 
