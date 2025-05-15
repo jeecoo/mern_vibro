@@ -15,6 +15,11 @@ const groupUserSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Group",
         required: true
+    },
+    isMonitoringOn:{
+        type: Boolean,
+        required: true,
+        default: false
     }
 }, { timestamps: true });
 

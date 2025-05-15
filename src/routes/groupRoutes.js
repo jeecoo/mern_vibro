@@ -130,7 +130,11 @@ router.put('/:groupId', verifyToken, async (req, res) => {
     try {
         const { groupName, groupPhoto, isActive } = req.body;
         const groupId = req.params.groupId;
-        const userId = req.user.userId;
+        const userId = req.user.userId; // ID of the user making the request
+
+        console.log("Updating group with ID:", groupId);
+        console.log("User ID:", userId);
+        console.log("Request Body:", req.body);
 
         const group = await Group.findById(groupId);
 
@@ -138,38 +142,85 @@ router.put('/:groupId', verifyToken, async (req, res) => {
             return res.status(404).json({ message: 'Group not found' });
         }
 
-        // Authorization: Check if the logged-in user is an admin of this group
-        if (!group.admins.includes(userId)) {
-            return res.status(403).json({ message: 'User not authorized to update this group.' });
+        // --- Corrected Authorization Check using GroupUser ---
+        const groupUser = await GroupUser.findOne({ groupid: groupId, userid: userId });
+
+        // If the user is not found in GroupUser for this group, or they are not an admin
+        if (!groupUser || !groupUser.isAdmin) {
+             // Added check if the user is also the group creator as an alternative admin check
+             // depending on your desired logic.
+             // For now, strictly checking GroupUser isAdmin status.
+             // If creator should always be admin: add || (group.createdBy && group.createdBy.equals(userId))
+             // but your createGroup route already creates a GroupUser with isAdmin: true for the creator.
+            return res.status(403).json({ message: 'User not authorized to update this group. Only admins can modify group settings.' });
         }
+        // --- End of Corrected Authorization Check ---
+
 
         if (groupName !== undefined) {
             if (groupName.trim().length < 3) {
-                 return res.status(400).json({ message: 'Group name must be at least 3 characters long.' });
+                return res.status(400).json({ message: 'Group name must be at least 3 characters long.' });
             }
             group.groupName = groupName.trim();
+            console.log("New group name:", group.groupName);
         }
         if (groupPhoto !== undefined) {
-            group.groupPhoto = groupPhoto; // Allow empty string to remove photo
+            group.groupPhoto = groupPhoto;
+            console.log("New group photo:", group.groupPhoto);
         }
         if (isActive !== undefined && typeof isActive === 'boolean') {
             group.isActive = isActive;
+            console.log("Is active:", group.isActive);
         }
 
+        console.log("Group object before save:", group);
         const updatedGroup = await group.save();
-        const populatedGroup = await Group.findById(updatedGroup._id)
-            .populate('members', 'username profileImage email')
-            .populate('admins', 'username profileImage email')
-            .populate('createdBy', 'username profileImage email');
+        console.log("Group object after save:", updatedGroup);
+
+        // It's important to populate the related users for the response if the client needs them
+        // However, since membership is handled by GroupUser, populating 'members'/'admins'
+        // directly on Group might not reflect the GroupUser data unless your Group schema
+        // is explicitly set up to manage these arrays AND they are kept in sync.
+        // If you rely solely on GroupUser for membership/admin status, you might
+        // adjust the response structure or fetch members/admins separately.
+        // For consistency with other routes, keeping the populate calls assumes
+        // your Group model *does* have these fields and they *are* synced,
+        // which might be the part you need to verify in your Group model hooks/logic.
+
+         const populatedGroup = await Group.findById(updatedGroup._id)
+            .populate('createdBy', 'username profileImage email');
+
 
         res.status(200).json({ group: populatedGroup, message: 'Group updated successfully' });
+
     } catch (error) {
         console.error("Error updating group:", error);
         if (error.name === 'ValidationError') {
             return res.status(400).json({ message: error.message });
         }
+         // Catch potential Mongoose cast errors for groupId if it's invalid
+         if (error instanceof mongoose.CastError) {
+             return res.status(400).json({ message: 'Invalid group ID format' });
+         }
         res.status(500).json({ message: 'Server error while updating group', error: error.message });
     }
+});
+
+router.get('/getMembers/:groupId',verifyToken, async (req, res) => {
+    // ... (previous logic to get groupId) ...
+    const groupUserLinks = await GroupUser.find({ groupid: new mongoose.Types.ObjectId(groupId) })
+    .populate('userid', 'username profileImage email'); // This is the correct place to populate user details via the join model
+
+    // Process groupUserLinks to extract user info and admin status if needed
+    const users = groupUserLinks.map(link => ({
+        _id: link.userid._id,
+        username: link.userid.username,
+        profileImage: link.userid.profileImage,
+        email: link.userid.email,
+        isAdmin: link.isAdmin // You can include admin status here
+    }));
+
+    res.status(200).json({ users }); // Send the list of users
 });
 
 // 5. Delete a group
@@ -256,67 +307,99 @@ router.post('/:groupId/members', verifyToken, async (req, res) => {
 
 // 7. Remove a member from a group
 // DELETE /api/groups/:groupId/members/:memberId
-// Requires authentication. Logged-in user must be an admin OR the member being removed.
+// Requires authentication. Logged-in user must be an admin of the group OR the member being removed.
 router.delete('/:groupId/members/:memberId', verifyToken, async (req, res) => {
-    try {
-        const { groupId, memberId } = req.params;
-        const loggedInUserId = req.user.userId;
+    try {
+        const { groupId, memberId } = req.params;
+        const loggedInUserId = req.user.userId; // User making the request
 
+        // --- Step 1: Find the GroupUser link for the member being removed ---
+        const memberGroupUserLink = await GroupUser.findOne({
+            groupid: groupId,
+            userid: memberId
+        });
+
+        if (!memberGroupUserLink) {
+            return res.status(404).json({ message: 'Member not found in this group.' });
+        }
+
+        // --- Step 2: Authorization Check ---
+        // Find the GroupUser link for the user making the request (to check if they are an admin)
+        const requestingUserGroupLink = await GroupUser.findOne({
+            groupid: groupId,
+            userid: loggedInUserId
+        });
+
+        const isAdmin = requestingUserGroupLink ? requestingUserGroupLink.isAdmin : false;
+        const isRemovingSelf = loggedInUserId === memberId;
+
+        // User must be an admin OR be removing themselves
+        if (!isAdmin && !isRemovingSelf) {
+            return res.status(403).json({ message: 'User not authorized to remove this member.' });
+        }
+
+        // --- Step 3: Handle edge case: Prevent removing the last admin ---
+        // Count admins *before* removal using GroupUser
+        const adminLinksBeforeRemoval = await GroupUser.find({ groupid: groupId, isAdmin: true });
+        const isLastAdminBeingRemoved = adminLinksBeforeRemoval.length === 1 && adminLinksBeforeRemoval[0].userid.equals(memberId);
+
+        // Get the Group document (still needed for creator check and potential isActive update)
         const group = await Group.findById(groupId);
+         // Need group to exist for creator check
         if (!group) {
-            return res.status(404).json({ message: 'Group not found.' });
+             // This case should ideally not happen if memberGroupUserLink exists,
+             // but it's a safety check.
+             return res.status(404).json({ message: 'Group associated with membership not found.' });
+        }
+        const isCreator = group.createdBy && group.createdBy.equals(memberId);
+
+
+        // Count members *before* removal using GroupUser
+        const memberLinksBeforeRemoval = await GroupUser.find({ groupid: groupId });
+        const isLastMemberBeingRemoved = memberLinksBeforeRemoval.length === 1 && memberLinksBeforeRemoval[0].userid.equals(memberId);
+
+
+        // If the member being removed is the creator, is an admin, is the last admin, and the last member
+        if (isCreator && memberGroupUserLink.isAdmin && isLastAdminBeingRemoved && isLastMemberBeingRemoved) {
+            return res.status(400).json({ message: 'Cannot remove the group creator if they are the last admin and member. Delete the group instead or assign a new admin.' });
+        }
+         // Optional: Add logic here if an admin is removing the creator who is the *only* admin but *not* the last member.
+
+
+        // --- Step 4: Delete the GroupUser document (This is the main action) ---
+        await GroupUser.deleteOne({ _id: memberGroupUserLink._id });
+
+        // --- Step 5: Check if the group is now empty and deactivate it (using GroupUser count) ---
+        const remainingMemberLinks = await GroupUser.find({ groupid: groupId });
+
+        if (remainingMemberLinks.length === 0) {
+             group.isActive = false; // Deactivate the group
+             await group.save(); // Save the change to the Group document
+             // Optionally delete the group entirely if it becomes empty: await Group.findByIdAndDelete(groupId);
+             // console.log(`Group ${groupId} is now empty and deactivated.`);
+        } else {
+            // Optional: If the removed member was the last admin (but not the creator/last member handled above)
+            // and there are other members left, you might need logic here to assign a new admin.
+            const remainingAdminLinks = await GroupUser.find({ groupid: groupId, isAdmin: true });
+            if (memberGroupUserLink.isAdmin && remainingAdminLinks.length === 0) {
+                console.warn(`Group ${groupId} is now without admins after member ${memberId} was removed.`);
+                // Implement logic to select a new admin or notify users.
+            }
         }
 
-        // Check if the member to remove is actually in the group
-        const memberIndex = group.members.indexOf(memberId);
-        if (memberIndex === -1) {
-            return res.status(404).json({ message: 'Member not found in this group.' });
-        }
 
-        // Authorization:
-        // 1. Logged-in user is an admin of the group OR
-        // 2. Logged-in user is the member being removed (leaving the group)
-        const isAdmin = group.admins.includes(loggedInUserId);
-        const isRemovingSelf = loggedInUserId === memberId;
+        // Success response
+        res.status(200).json({ message: 'Member removed successfully.' });
 
-        if (!isAdmin && !isRemovingSelf) {
-            return res.status(403).json({ message: 'User not authorized to remove this member.' });
-        }
-        
-        // Prevent removing the creator if they are the last admin and member
-        // This is a simplified check; more complex logic might be needed for "last admin" scenarios
-        if (group.createdBy.equals(memberId) && group.admins.includes(memberId) && group.admins.length === 1 && group.members.length === 1) {
-            return res.status(400).json({ message: 'Cannot remove the group creator if they are the last admin and member. Delete the group instead or assign a new admin.' });
-        }
-
-
-        group.members.pull(memberId); // Remove from members array
-        group.admins.pull(memberId);  // Also remove from admins array if they were an admin
-
-        // Optional: If the group becomes empty, you might want to make it inactive or delete it.
-        if (group.members.length === 0) {
-            group.isActive = false;
-            // Or: await Group.findByIdAndDelete(groupId);
-            // console.log(Group ${groupId} is now empty and deactivated.);
-        }
-        
-        // If the last admin is removed (and it's not the creator who is also the last member)
-        // you might need logic to assign a new admin or handle the group.
-        // For simplicity, this is not deeply handled here.
-
-        await group.save();
-        const populatedGroup = await Group.findById(groupId)
-            .populate('members', 'username profileImage email')
-            .populate('admins', 'username profileImage email')
-            .populate('createdBy', 'username profileImage email');
-
-        res.status(200).json({ group: populatedGroup, message: 'Member removed successfully.' });
-
-    } catch (error) {
-        console.error("Error removing member from group:", error);
-        res.status(500).json({ message: 'Server error while removing member.', error: error.message });
-    }
+    } catch (error) {
+        console.error("Error removing member from group:", error);
+        if (error instanceof mongoose.CastError) {
+            return res.status(400).json({ message: 'Invalid ID format.' });
+        }
+        res.status(500).json({ message: 'Server error while removing member.', error: error.message });
+    }
 });
+
 
 
 
@@ -345,16 +428,19 @@ router.post('/:groupId/join', verifyToken, async (req, res) => {
         await groupUser.save();
 
         // Optionally, update the group's members list
-        group.members.push(userId);
-        await group.save();
+        // group.members.push(userId);
+        // await group.save();
 
         // Return the updated group with the new member
-        const populatedGroup = await Group.findById(groupId)
-            .populate('members', 'username profileImage email')
-            .populate('admins', 'username profileImage email')
-            .populate('createdBy', 'username profileImage email');
+        // const populatedGroup = await Group.findById(groupId)
+        //     .populate('members', 'username profileImage email')
+        //     .populate('admins', 'username profileImage email')
+        //     .populate('createdBy', 'username profileImage email');
 
-        res.status(200).json({ group: populatedGroup, message: 'Joined group successfully.' });
+        res.status(200).json({
+             group: group, // Return the group object you already fetched
+             message: 'Joined group successfully.'
+         });
     } catch (error) {
         console.error("Error joining group:", error);
         res.status(500).json({ message: 'Server error while joining group', error: error.message });

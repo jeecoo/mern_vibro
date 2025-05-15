@@ -1,12 +1,15 @@
+// models/Messages.js
+import mongoose from "mongoose";
+
 const messageSchema = new mongoose.Schema({
     senderId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+        ref: "User", 
         required: true,
     },
-    groupId: { 
+    groupId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Group", 
+        ref: "Group",
         required: true,
     },
     messageType: {
@@ -14,15 +17,25 @@ const messageSchema = new mongoose.Schema({
         enum: ["text", "image"],
         required: true,
     },
-    message: { 
+    messageText: { 
         type: String,
-        required: true,
+        trim: true,
+        default: null, 
     },
     imageUrl: {
         type: String,
-        default: "",
+        default: null, 
     },
+    readBy: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+    }],
+    // 'chat' field removed as groupId serves the purpose for group chats
+    // 'content' field removed as messageText and imageUrl cover it
 }, { timestamps: true }); 
+
+
+messageSchema.index({ groupId: 1, createdAt: 1 });
 
 const Message = mongoose.model("Message", messageSchema);
 export default Message;
