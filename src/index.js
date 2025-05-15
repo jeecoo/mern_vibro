@@ -13,10 +13,19 @@ import messageRoutes from './routes/messageRoutes.js';
 
 
 import DetectedSound from './models/DetectedSound.js';
+import bodyParser from 'body-parser'
+
+
 
 const userSockets = new Map();       // userId => Set of socketIds
 const socketGroups = new Map();  
 const app = express();
+app.use(bodyParser.json({ limit: '10mb' }));
+
+
+app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
+
+
 const server = http.createServer(app); // Create a separate HTTP server
 const io = new Server(server, {
   cors: {
