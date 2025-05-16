@@ -10,10 +10,12 @@ import groupRoutes from "./routes/groupRoutes.js";
 import { connectDB } from "./lib/db.js";
 import detectedSoundRoutes from "./routes/detectedSoundRoutes.js";
 import messageRoutes from './routes/messageRoutes.js';
-
+import modelRoutes from "./routes/modelRoutes.js";
 
 import DetectedSound from './models/DetectedSound.js';
 import bodyParser from 'body-parser'
+import customSoundRoutes from "./routes/customSoundRoutes.js";
+import { model } from "mongoose";
 
 
 
@@ -100,6 +102,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/group", groupRoutes);
 app.use("/api/detectedSound", detectedSoundRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/customSound", customSoundRoutes);
+app.use("/api/model", modelRoutes);
 
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
