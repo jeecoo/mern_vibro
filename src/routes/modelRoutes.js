@@ -36,6 +36,17 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+router.get("/bygroup/:id", async (req, res) => {
+  try {
+    console.log("Fetching model by group ID:", req.params.id);
+    
+    const model = await Model.findOne({ groupId: req.params.id });
+    if (!model) return res.status(404).json({ message: "Model not found" });
+    res.json(model);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
 // Update a model by ID
 router.put("/:id", async (req, res) => {
