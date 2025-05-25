@@ -135,4 +135,35 @@ router.put('/update', verifyToken, async (req, res) => {
     }
 });
 
+
+
+router.put('/set-active', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { isActive } = req.body;
+
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ message: '`isActive` must be a boolean' });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { isActive },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({
+      user: updatedUser,
+      message: `User isActive status set to ${isActive}`,
+    });
+  } catch (error) {
+    console.error("Error in set-active route:", error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 export default router;
