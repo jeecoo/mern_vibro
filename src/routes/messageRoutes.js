@@ -9,10 +9,10 @@ import crypto from 'crypto';
 
 const router = express.Router();
 
-// === Encryption Helpers ===
+
 
 const algorithm = 'aes-256-cbc';
-const ivLength = 16; // AES block size
+const ivLength = 16; 
 
 function getKeyFromGroupId(groupId) {
   return crypto.createHash('sha256').update(groupId).digest();
@@ -41,7 +41,7 @@ function decryptText(encryptedData, iv, groupId) {
   return decrypted;
 }
 
-// === Send Message ===
+
 
 router.post('/send', verifyToken, async (req, res) => {
   try {
@@ -108,7 +108,7 @@ router.post('/send', verifyToken, async (req, res) => {
   }
 });
 
-// === Get All Messages for Group ===
+
 
 router.get('/:groupId', verifyToken, async (req, res) => {
   try {
@@ -149,7 +149,7 @@ router.get('/:groupId', verifyToken, async (req, res) => {
   }
 });
 
-// === Get Messages From Specific User ===
+
 
 router.get('/:groupId/user/:userId', verifyToken, async (req, res) => {
   try {
