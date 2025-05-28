@@ -30,6 +30,7 @@ const messageSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "User"
     }],
+    iv: { type: String },
     // 'chat' field removed as groupId serves the purpose for group chats
     // 'content' field removed as messageText and imageUrl cover it
 }, { timestamps: true }); 
