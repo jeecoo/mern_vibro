@@ -3,7 +3,7 @@ import Message from '../models/Messages.js';
 import Group from '../models/Group.js';
 import GroupUser from '../models/GroupUser.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
-import { io } from '../index.js';
+import { io,socketGroups,userSockets  } from '../index.js';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 
@@ -97,7 +97,12 @@ router.post('/send', verifyToken, async (req, res) => {
     }
 
     io.to(groupId.toString()).emit("newMessage", populatedMessage);
-
+    
+    io.to(groupId.toString()).emit("notifyNewMessage", {
+      groupName: group.groupName,
+      senderId: populatedMessage.senderId._id,
+      senderUsername: populatedMessage.senderId.username
+    });
     res.status(201).json(populatedMessage);
   } catch (error) {
     console.error("Error sending message:", error);
