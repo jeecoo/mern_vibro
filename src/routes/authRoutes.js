@@ -143,7 +143,7 @@ router.put('/set-active', verifyToken, async (req, res) => {
     const { isActive } = req.body;
 
     if (typeof isActive !== 'boolean') {
-      return res.status(400).json({ message: '`isActive` must be a boolean' });
+      return res.status(400).json({ message: '`isActive` must be boolean' });
     }
 
     const updatedUser = await User.findByIdAndUpdate(
