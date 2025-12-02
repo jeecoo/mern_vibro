@@ -13,6 +13,10 @@ const groupSchema = new mongoose.Schema({
         type: String,
         default: "", 
     },
+    groupModelUrl: {
+        type: String,
+        default: "", 
+    },
     isActive: {
         type: Boolean,
         default: true, 

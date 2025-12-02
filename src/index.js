@@ -17,6 +17,8 @@ import bodyParser from 'body-parser'
 import customSoundRoutes from "./routes/customSoundRoutes.js";
 import { model } from "mongoose";
 
+// Example of a one-time migration script (run once and then remove/comment out)
+import Group from './models/Group.js';
 
 
 const userSockets = new Map();       // userId => Set of socketIds
@@ -112,6 +114,22 @@ server.listen(PORT, () => {
 
 
 
+// async function migrateDocuments() {
+//     try {
+//         const updateResult = await Group.updateMany(
+//             // Query: Find all documents where groupModelUrl is NOT set
+//             { groupModelUrl: { $exists: false } },
+//             // Update: Set groupModelUrl to the default value
+//             { $set: { groupModelUrl: "" } }
+//         );
+
+//         console.log(`${updateResult.modifiedCount} documents updated.`);
+//     } catch (error) {
+//         console.error("Migration failed:", error);
+//     }
+// }
+
+// migrateDocuments(); // Uncomment and run this once if needed.
 
 
 setInterval(async () => {
