@@ -448,6 +448,81 @@ router.post('/:groupId/join', verifyToken, async (req, res) => {
 });
 
 
+// --- CustomSound Endpoints (Revised contributions route to include all members) ---
+
+router.get('/contributions/:groupId', verifyToken, async (req, res) => {
+    try {
+        const { groupId } = req.params;
+        const userId = req.userId; // Authenticated user ID
+        console.log("Fetching contributions for groupId:", groupId, "by userId:", userId);
+
+        if (!mongoose.Types.ObjectId.isValid(groupId)) {
+            return res.status(400).json({ message: 'Invalid groupId' });
+        }
+
+        // SECURITY CHECK: Ensure the requesting user is a member of the group.
+        const isMember = await GroupUser.findOne({
+            groupid: groupId,
+            userid: userId,
+        });
+
+        if (!isMember) {
+            return res.status(403).json({ message: 'User is not a member of this group or group not found.' });
+        }
+        
+        // Aggregation to count contributions per user
+        const contributions = await GroupUser.aggregate([
+            { $match: { groupid: new mongoose.Types.ObjectId(groupId) } },
+            {
+                $lookup: {
+                    from: 'customsounds',
+                    let: { uid: '$userid' },
+                    pipeline: [
+                        { 
+                            $match: { 
+                                $expr: { 
+                                    $and: [
+                                        { $eq: ['$userId', '$$uid'] },
+                                        { $eq: ['$groupId', new mongoose.Types.ObjectId(groupId)] }
+                                    ]
+                                }
+                            }
+                        },
+                        { $count: 'count' }
+                    ],
+                    as: 'soundsData'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userid',
+                    foreignField: '_id',
+                    as: 'userInfo'
+                }
+            },
+            { $unwind: '$userInfo' },
+            {
+                $project: {
+                    _id: 0,
+                    name: '$userInfo.username',
+                    sounds: { 
+                        $ifNull: [{ $arrayElemAt: ['$soundsData.count', 0] }, 0]
+                    }
+                }
+            },
+            // Sort by sounds descending
+            { $sort: { sounds: -1 } }
+        ]);
+
+        res.json({ contributions });
+    } catch (error) {
+        console.error('Error fetching contributions:', error);
+        res.status(500).json({ message: 'Failed to fetch contributions' });
+    }
+});
+
+
 
 
 export default router;
