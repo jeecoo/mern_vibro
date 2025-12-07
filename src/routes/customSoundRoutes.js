@@ -49,7 +49,7 @@ router.post('/addFolder', verifyToken, async (req, res) => {
 router.put('/removeFolder', verifyToken, async (req, res) => {
   try {
     const { folderId } = req.body;
-
+  
     if (!mongoose.Types.ObjectId.isValid(folderId)) {
       return res.status(400).json({ message: 'Invalid folderId' });
     }
@@ -60,9 +60,9 @@ router.put('/removeFolder', verifyToken, async (req, res) => {
     }
 
     // Optionally, you can add a check to ensure only the creator or admin can remove
-    // if (folder.createdBy.toString() !== req.userId) {
-    //   return res.status(403).json({ message: 'Unauthorized to remove this folder' });
-    // }
+    if (folder.createdBy.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Unauthorized to remove this folder' });
+    }
 
     // Also, consider removing associated sounds in this folder
     await CustomSound.deleteMany({ folderId });
@@ -138,7 +138,6 @@ router.post('/addSound', verifyToken, async (req, res) => {
 router.put('/removeSound', verifyToken, async (req, res) => {
   try {
     const { soundId } = req.body;
-    const userId = req.userId; // From verifyToken
 
     if (!mongoose.Types.ObjectId.isValid(soundId)) {
       return res.status(400).json({ message: 'Invalid soundId' });
@@ -150,7 +149,7 @@ router.put('/removeSound', verifyToken, async (req, res) => {
     }
 
     // Optionally, ensure only the creator or admin can remove
-    if (sound.userId.toString() !== userId) {
+    if (sound.userId.toString() !== req.userId) {
       return res.status(403).json({ message: 'Unauthorized to remove this sound' });
     }
 
