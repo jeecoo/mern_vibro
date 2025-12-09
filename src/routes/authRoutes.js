@@ -5,12 +5,20 @@ import mongoose from 'mongoose'; // Ensure this is at the top of your file
 
 import { verifyToken } from '../middleware/authMiddleware.js'; 
 
+import { sendEmail, generateOTP } from '../utils/sendEmail.js';
+
 
 const router = express.Router();
 
 const generateToken = (userId) => {
     return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '15d' });
 }
+
+
+// **Temporary in-memory store for registration and OTP**
+// In a real application, use a dedicated Mongoose model or Redis for better persistence and scalability.
+const pendingRegistrations = {}; // { email: { username, password, otp, expiry } }
+const OTP_EXPIRY_MINUTES = 5;
 
 
 router.post('/register', async (req, res) => {
@@ -36,35 +44,125 @@ router.post('/register', async (req, res) => {
         const existingUser = await User.findOne({ username });
         if (existingUser) return res.status(400).json({ message: 'Username already exists ' });
         
-        //get random avatar
-        const profileImage = `https://api.dicebear.com/9.x/bottts/svg?seed=${username}`;
+
+        // --- OTP Generation and Email Sending ---
+        const otp = generateOTP();
+        const expiry = Date.now() + (OTP_EXPIRY_MINUTES * 60 * 1000); // 5 minutes from now
         
+        // Store details temporarily
+        pendingRegistrations[email] = {
+            username,
+            password,
+            otp,
+            expiry,
+            profileImage: `https://api.dicebear.com/9.x/bottts/svg?seed=${username}`
+        };
+
+        const subject = 'Your Registration Verification Code'; // Assume subject and text are defined or imported
+        const text = `Your OTP is ${otp}`;
+        // //get random avatar
+        // const profileImage = `https://api.dicebear.com/9.x/bottts/svg?seed=${username}`;
+
+        // Send the email (handle potential failure of sendEmail)
+        await sendEmail(email, subject, text);
+
+        res.status(202).json({ 
+            message: `OTP sent to ${email}. Please verify to complete registration.`,
+            // Optional: return expiry time to the client
+            otpExpiry: expiry 
+        });
+        
+        // const user = new User({
+        //     email,
+        //     username,
+        //     password,
+        //     profileImage,
+        // })
+
+        // await user.save();
+
+        // const token = generateToken(user._id);
+
+        // res.status(201).json({
+        //     token,
+        //     user:{
+        //         _id: user._id,
+        //         username: user.username,
+        //         email: user.email,
+        //         profileImage: user.profileImage,
+        //     }
+        // });
+
+    } catch (error) {
+        console.error("Error in register route (send OTP):", error);
+        // Important: If email sending fails, clear the pending registration
+        if (pendingRegistrations[req.body.email]) {
+             delete pendingRegistrations[req.body.email];
+        }
+        res.status(500).json({ message: 'Server error: Could not send verification email.' });
+    }
+});
+
+router.post('/verify-otp', async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        // ... (Input validation and pending data retrieval)
+        
+        const registrationData = pendingRegistrations[email];
+
+        // 1. Check if we have pending data for this email
+        if (!registrationData) {
+            return res.status(400).json({ message: 'No pending registration found or session expired.' });
+        }
+
+        // 2. Check for OTP expiry
+        if (Date.now() > registrationData.expiry) {
+            delete pendingRegistrations[email]; // Clean up expired data
+            return res.status(400).json({ message: 'OTP has expired. Please try registering again.' });
+        }
+
+        // 3. Check if OTP matches
+        if (otp !== registrationData.otp) {
+            return res.status(400).json({ message: 'Invalid OTP.' });
+        }
+
+        // --- OTP Valid: Finalize Registration (User Creation) ---
+        
+        const { username, password, profileImage } = registrationData;
+
+        // Ensure user does not already exist
+        if (await User.findOne({ email })) {
+             delete pendingRegistrations[email];
+             return res.status(400).json({ message: 'User already verified and exists.' });
+        }
+
         const user = new User({
             email,
             username,
-            password,
+            password, 
             profileImage,
-        })
+        });
 
-        await user.save();
+        await user.save(); 
+        
+        // Clean up the temporary store
+        delete pendingRegistrations[email]; 
 
-        const token = generateToken(user._id);
+        // const token = generateToken(user._id);
 
-        res.status(201).json({
-            token,
-            user:{
-                _id: user._id,
-                username: user.username,
-                email: user.email,
-                profileImage: user.profileImage,
-            }
+        // This is the correct, single response.
+       return res.status(201).json({
+            message: 'Account successfully verified. Please log in.',
+            // Remove token and user object completely from the response
         });
 
     } catch (error) {
-        console.log("Error in register route", error);
-        res.status(500).json({ message: 'Server error' });
+        console.error("Error in verify-otp route:", error);
+        res.status(500).json({ message: 'Server error during user creation.' });
     }
 });
+
+
 
 
 router.post('/login', async (req, res) => {
