@@ -226,31 +226,48 @@ router.get('/getMembers/:groupId',verifyToken, async (req, res) => {
 // 5. Delete a group
 // DELETE /api/groups/:groupId
 // Requires authentication and user to be an admin of the group (or creator)
+// DELETE /api/groups/:groupId
 router.delete('/:groupId', verifyToken, async (req, res) => {
-    try {
-        const groupId = req.params.groupId;
-        const userId = req.user.userId;
+  try {
+    const groupId = req.params.groupId;
+    const userId = req.user.userId;
 
-        const group = await Group.findById(groupId);
+    const group = await Group.findById(groupId);
 
-        if (!group) {
-            return res.status(404).json({ message: 'Group not found' });
-        }
-
-        // Authorization: Check if the logged-in user is an admin or the creator
-        // For simplicity, only admins can delete. You can add || group.createdBy.equals(userId)
-        if (!group.admins.includes(userId)) {
-            return res.status(403).json({ message: 'User not authorized to delete this group. Only admins can delete.' });
-        }
-
-        await Group.findByIdAndDelete(groupId);
-
-        res.status(200).json({ message: 'Group deleted successfully' });
-    } catch (error) {
-        console.error("Error deleting group:", error);
-        res.status(500).json({ message: 'Server error while deleting group', error: error.message });
+    if (!group) {
+      return res.status(404).json({ message: 'Group not found' });
     }
+
+    // Authorization: admin or creator
+    const isAdmin = group.admins?.includes(userId);
+    const isCreator = group.createdBy?.equals(userId);
+
+    if (!isAdmin && !isCreator) {
+      return res.status(403).json({
+        message: 'User not authorized to delete this group.'
+      });
+    }
+
+    // ✅ DELETE ALL GroupUser LINKS FIRST
+    await GroupUser.deleteMany({ groupid: groupId });
+
+    // ✅ DELETE GROUP
+    await Group.findByIdAndDelete(groupId);
+
+    res.status(200).json({
+      message: 'Group and all memberships deleted successfully',
+      groupDeleted: true,
+    });
+
+  } catch (error) {
+    console.error("Error deleting group:", error);
+    res.status(500).json({
+      message: 'Server error while deleting group',
+      error: error.message
+    });
+  }
 });
+
 
 
 // --- Member Management ---
@@ -336,6 +353,7 @@ router.delete('/:groupId/members/:memberId', verifyToken, async (req, res) => {
         // User must be an admin OR be removing themselves
         if (!isAdmin && !isRemovingSelf) {
             return res.status(403).json({ message: 'User not authorized to remove this member.' });
+
         }
 
         // --- Step 3: Handle edge case: Prevent removing the last admin ---
@@ -361,8 +379,11 @@ router.delete('/:groupId/members/:memberId', verifyToken, async (req, res) => {
 
         // If the member being removed is the creator, is an admin, is the last admin, and the last member
         if (isCreator && memberGroupUserLink.isAdmin && isLastAdminBeingRemoved && isLastMemberBeingRemoved) {
-            return res.status(400).json({ message: 'Cannot remove the group creator if they are the last admin and member. Delete the group instead or assign a new admin.' });
-        }
+           return res.status(400).json({
+            message: 'LAST_ADMIN_CANNOT_LEAVE',
+            });
+
+ }
          // Optional: Add logic here if an admin is removing the creator who is the *only* admin but *not* the last member.
 
 
