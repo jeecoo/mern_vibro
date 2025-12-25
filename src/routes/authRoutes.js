@@ -167,7 +167,7 @@ router.post('/verify-otp', async (req, res) => {
 
 router.post('/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password,fcmId } = req.body;
         console.log(email+password)
         if(!email || !password) return res.status(400).json({ message: "Please fill in all fields" });
         
@@ -180,6 +180,10 @@ router.post('/login', async (req, res) => {
         if (!isPasswordMatch) return res.status(400).json({ message: "Invalid credentials" });
 
         //generate token
+           if (fcmId && user.fcmId !== fcmId) {
+            user.fcmId = fcmId;
+            await user.save();
+            }
         const token = generateToken(user._id);
 
         res.status(200).json({
