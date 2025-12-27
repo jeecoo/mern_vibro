@@ -124,11 +124,10 @@ for (const gu of groupUsers) {
 
     const message = {
       token: userMember.fcmId,
-      notification: {
+    
+      data: {
         title: `🚨 Sound Detected from ${group.groupName}`,
         body: `${user.username}: ${label}`,
-      },
-      data: {
         type: 'SOUND',
         groupId: group._id.toString(),
         groupName: group.groupName,

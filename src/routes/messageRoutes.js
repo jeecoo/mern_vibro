@@ -2,10 +2,13 @@ import express from 'express';
 import Message from '../models/Messages.js';
 import Group from '../models/Group.js';
 import GroupUser from '../models/GroupUser.js';
+import User from '../models/User.js';
+
 import { verifyToken } from '../middleware/authMiddleware.js';
 import { io,socketGroups,userSockets  } from '../index.js';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
+import admin from '../lib/firebaseAdmin.js';
 
 const router = express.Router();
 
@@ -103,6 +106,43 @@ router.post('/send', verifyToken, async (req, res) => {
       senderId: populatedMessage.senderId._id,
       senderUsername: populatedMessage.senderId.username
     });
+
+    const notifiedTokens = new Set();
+
+      const members = await GroupUser.find({ groupid: groupId });
+    const fullText = message; // original message text
+    const shortText =
+      fullText.length > 40 ? fullText.substring(0, 40) + '…' : fullText;
+
+      for (const member of members) {
+        if (member.userid.toString() === senderId) continue;
+    
+        const userMember = await User.findById(member.userid);
+        if (!userMember?.fcmId) continue;
+        if (notifiedTokens.has(userMember.fcmId)) continue;
+    
+        const message = {
+          token: userMember.fcmId,
+          notification: {
+            title: `new Message from ${group.groupName}`,
+            body: `${shortText}`,
+          },
+          data: {
+            type: 'MESSAGE',
+            groupId: group._id.toString(),
+            groupName: group.groupName,
+            messageText: fullText.toString(),
+          },
+        };
+    
+        try {
+          await admin.messaging().send(message);
+          notifiedTokens.add(userMember.fcmId);
+          console.log(`✅ FCM sent to ${userMember.username}`);
+        } catch (err) {
+          console.error('❌ FCM failed:', err.message);
+        }
+      }
     res.status(201).json(populatedMessage);
   } catch (error) {
     console.error("Error sending message:", error);
