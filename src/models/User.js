@@ -24,6 +24,10 @@ const userSchema = new mongoose.Schema({
     isActive: {
         type: Boolean,
         default: false,
+    },
+    fcmId: {
+        type: String,
+        default: "",
     }
 
 }, { timestamps: true });
